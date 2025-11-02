@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package texteditor;
+
+option java_multiple_files = true;
+option java_package = "com.texteditor.grpc";
+option java_outer_classname = "TextEditorProto";
+
+service TextEditorService {
+  // Document lifecycle
+  rpc CreateDocument(CreateDocumentRequest) returns (CreateDocumentResponse);
+  rpc CloseDocument(CloseDocumentRequest) returns (CloseDocumentResponse);
+
+  // Text operations
+  rpc Insert(InsertRequest) returns (OperationResponse);
+  rpc Delete(DeleteRequest) returns (OperationResponse);
+
+  // Cursor operations
+  rpc MoveCursor(MoveCursorRequest) returns (CursorResponse);
+  rpc GetCursorPosition(GetCursorPositionRequest) returns (CursorResponse);
+
+  // Query operations
+  rpc GetSubstring(GetSubstringRequest) returns (GetSubstringResponse);
+  rpc GetDocumentInfo(GetDocumentInfoRequest) returns (GetDocumentInfoResponse);
+
+  // Streaming support (optional future enhancement)
+  rpc StreamChanges(stream ChangeRequest) returns (stream ChangeResponse);
+}
+
+// Request/Response messages
+message CreateDocumentRequest {
+  string document_id = 1;  // Optional, server generates if empty
+  string initial_content = 2;
+  string buffer_type = 3;  // "simple", "rope", "piecetable"
+}
+
+message CreateDocumentResponse {
+  string document_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message CloseDocumentRequest {
+  string document_id = 1;
+}
+
+message CloseDocumentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message InsertRequest {
+  string document_id = 1;
+  int32 position = 2;      // Position to insert at (-1 for cursor position)
+  string text = 3;
+  bool move_cursor = 4;    // Move cursor after insertion
+}
+
+message DeleteRequest {
+  string document_id = 1;
+  int32 start_position = 2;  // Start of deletion range
+  int32 end_position = 3;    // End of deletion range
+  bool move_cursor = 4;      // Move cursor to start after deletion
+}
+
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+  int32 cursor_position = 3;  // Current cursor position after operation
+  int32 document_length = 4;   // Total length after operation
+}
+
+message MoveCursorRequest {
+  string document_id = 1;
+  oneof movement {
+    int32 absolute_position = 2;  // Move to absolute position
+    int32 relative_offset = 3;    // Move relative to current position
+  }
+}
+
+message GetCursorPositionRequest {
+  string document_id = 1;
+}
+
+message CursorResponse {
+  bool success = 1;
+  string message = 2;
+  int32 cursor_position = 3;
+  int32 document_length = 4;
+}
+
+message GetSubstringRequest {
+  string document_id = 1;
+  int32 start_position = 2;
+  int32 end_position = 3;     // -1 for end of document
+}
+
+message GetSubstringResponse {
+  bool success = 1;
+  string message = 2;
+  string text = 3;
+  int32 actual_length = 4;
+}
+
+message GetDocumentInfoRequest {
+  string document_id = 1;
+}
+
+message GetDocumentInfoResponse {
+  bool success = 1;
+  string message = 2;
+  string document_id = 3;
+  int32 length = 4;
+  int32 cursor_position = 5;
+  string buffer_type = 6;
+}
+
+// For streaming (future enhancement)
+message ChangeRequest {
+  string document_id = 1;
+  oneof operation {
+    InsertRequest insert = 2;
+    DeleteRequest delete = 3;
+    MoveCursorRequest move_cursor = 4;
+  }
+}
+
+message ChangeResponse {
+  OperationResponse result = 1;
+  int64 timestamp = 2;
+}
