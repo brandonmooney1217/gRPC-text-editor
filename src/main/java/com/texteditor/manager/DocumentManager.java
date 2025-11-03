@@ -1,10 +1,8 @@
 package com.texteditor.manager;
 
-import com.texteditor.buffer.SimpleBuffer;
-import com.texteditor.buffer.TextBuffer;
 import com.texteditor.document.Document;
-import com.texteditor.document.DocumentImpl;
 import com.texteditor.exception.DocumentNotFoundException;
+import com.texteditor.factory.DocumentFactory;
 
 import java.util.Collections;
 import java.util.Set;
@@ -33,11 +31,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * DocumentManager manager = new DocumentManager();
  *
  * // Create document with auto-generated ID
- * Document doc1 = manager.createDocument(null, "Hello", "simple");
+ * Document doc1 = manager.createDocument(null, "Hello");
  * System.out.println(doc1.getId());  // "doc-1"
  *
  * // Create document with explicit ID
- * Document doc2 = manager.createDocument("my-doc", "World", "simple");
+ * Document doc2 = manager.createDocument("my-doc", "World");
  *
  * // Retrieve document
  * Document retrieved = manager.getDocument("my-doc");
@@ -61,11 +59,41 @@ public class DocumentManager {
     private final AtomicLong documentCounter;
 
     /**
-     * Creates a new DocumentManager with no documents.
+     * Factory for creating new document instances.
+     * Encapsulates the creation logic and buffer selection.
+     */
+    private final DocumentFactory documentFactory;
+
+    /**
+     * Creates a new DocumentManager with a default DocumentFactory.
+     *
+     * <p>This is a convenience constructor that creates its own factory.
+     * For testing or custom factory implementations, use {@link #DocumentManager(DocumentFactory)}.
      */
     public DocumentManager() {
+        this(new DocumentFactory());
+    }
+
+    /**
+     * Creates a new DocumentManager with the specified DocumentFactory.
+     *
+     * <p>This constructor supports dependency injection, allowing you to:
+     * <ul>
+     *   <li>Inject a mock factory for testing</li>
+     *   <li>Use a custom factory with different buffer selection logic</li>
+     *   <li>Share a factory instance across multiple managers</li>
+     * </ul>
+     *
+     * @param documentFactory Factory to use for creating documents (must not be null)
+     * @throws IllegalArgumentException if documentFactory is null
+     */
+    public DocumentManager(DocumentFactory documentFactory) {
+        if (documentFactory == null) {
+            throw new IllegalArgumentException("DocumentFactory cannot be null");
+        }
         this.documents = new ConcurrentHashMap<>();
         this.documentCounter = new AtomicLong(1); // Start at 1 for "doc-1", "doc-2", etc.
+        this.documentFactory = documentFactory;
     }
 
     /**
@@ -74,9 +102,9 @@ public class DocumentManager {
      * <p>If the document ID is null or empty, a unique ID will be auto-generated
      * in the format "doc-N" where N is a sequential number.
      *
-     * <p>Implementation Note: Currently uses SimpleBuffer for all documents.
-     * The TextBuffer interface allows swapping to different implementations
-     * (RopeBuffer, PieceTableBuffer) in the future without changing this API.
+     * <p>Document creation is delegated to the DocumentFactory, which handles
+     * buffer selection and document instantiation. This separation of concerns
+     * allows for flexible buffer strategies without changing this API.
      *
      * @param documentId Document ID (if null or empty, auto-generates one)
      * @param initialContent Initial text content (use empty string for empty document)
@@ -97,17 +125,8 @@ public class DocumentManager {
             );
         }
 
-        // Ensure initial content is not null
-        if (initialContent == null) {
-            initialContent = "";
-        }
-
-        // Create buffer with initial content
-        // Currently using SimpleBuffer - can be changed to RopeBuffer/PieceTableBuffer later
-        TextBuffer buffer = new SimpleBuffer(initialContent);
-
-        // Create document with buffer
-        Document document = new DocumentImpl(id, buffer);
+        // Create document using factory
+        Document document = documentFactory.createDocument(id, initialContent);
 
         // Store in map
         documents.put(id, document);
